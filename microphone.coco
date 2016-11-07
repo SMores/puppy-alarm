@@ -1,0 +1,28 @@
+import pyaudio
+
+FORMAT = pyaudio.paInt24
+CHANNELS = 2
+RATE = 44100
+CHUNK = 1024
+
+data Microphone():
+    def open_stream(self):
+        p = pyaudio.PyAudio()
+        stream = p.open(RATE,
+                        CHANNELS,
+                        format=FORMAT,
+                        input=True,
+                        frames_per_buffer=CHUNK)
+        return Stream(p, stream)
+
+data Stream(audio, stream):
+    def frames(self):
+        # @recursive_iterator
+        def Frames() = (self.stream.read(CHUNK, exception_on_overflow=True),) :: Frames()
+        return Frames()
+
+    def close(self):
+        self.stream.stop_stream()
+        self.stream.close()
+        self.audio.terminate()
+
