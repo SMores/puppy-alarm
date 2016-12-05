@@ -1,0 +1,26 @@
+from sklearn.neural_network import MLPClassifier
+from librosa.feature import *
+from typing import List
+import librosa
+import numpy as np
+import _pickle as pickle
+
+def mean_of_t(arr: np.ndarray) -> np.ndarray = arr |> .T |> np.mean$(axis=0)
+
+def extract_features(file_name: str) -> np.ndarray =
+  X, sample_rate = librosa.load(file_name)
+  stft = X |> librosa.stft |> np.abs
+  np.hstack([
+    mfcc(y=X, sr=sample_rate, n_mfcc=40) |> mean_of_t,
+    chroma_stft(S=stft, sr=sample_rate) |> mean_of_t,
+    melspectrogram(X, sr=sample_rate) |> mean_of_t,
+    spectral_contrast(S=stft, sr=sample_rate) |> mean_of_t,
+    tonnetz(y=librosa.effects.harmonic(X), sr=sample_rate) |> mean_of_t
+  ])
+
+def train(file_names: List[str], labels: np.ndarray):
+  training_data = np.vstack(extract_features(file_name) for file_name in file_names)
+  clf = MLPClassifier(solver='lbfgs', alpha=1e-5,
+                      hidden_layer_sizes=(5, 2), random_state=1)
+  with open("classifier", "wb") as classifier_file:
+    (clf.fit(training_data, labels), classifier_file) |*> pickle.dump

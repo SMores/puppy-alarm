@@ -1,30 +1,38 @@
-from microphone import Microphone, CHUNK, RATE
+from microphone import Microphone, Stream, CHUNK, RATE, FORMAT, CHANNELS
 from multiprocessing import Queue, Process
+from typing import List, Any
+import pyaudio
+import wave
 
-def consume_frames(frames, q, num_sec if num_sec <= 0) = None
+def consume_frames([head] :: tail, q):
+  q.put(head)
+  consume_frames(tail, q)
 
-@addpattern(consume_frames)
-def consume_frames([head] :: tail, q, num_sec) =
-  head |> q.put
-  consume_frames(tail, q, num_sec - (CHUNK / RATE))
-
-def begin_consumption(mic, q, num_sec):
+def listen(mic: Microphone, q: Queue):
   stream = mic.open_stream()
-  consume_frames(stream.frames(), q, num_sec)
-  stream.close()
+  consume_frames(stream.frames(), q)
 
-def destroy_frames(q) =
-  """This is a temp function to make sure the queue is being generated properly."""
-  q.get()
-  destroy_frames(q)
+def read_frames(q, acc, num_sec if num_sec <= 0) = acc
+
+@addpattern(read_frames)
+def read_frames(q: Queue, acc: List[str], num_sec: int) -> List[str] = read_frames(q, acc + [q.get()], num_sec - (CHUNK / RATE))
+
+def put_to_wav(frames: List[str], name: str):
+  with wave.open(name, 'wb') as wave_file:
+    wave_file.setnchannels(CHANNELS)
+    wave_file.setsampwidth(pyaudio.get_sample_size(FORMAT))
+    wave_file.setframerate(RATE)
+    wave_file.writeframes(b''.join(frames))
 
 if __name__ == '__main__':
   q = Queue()
-  p = Process(target=begin_consumption, args=(Microphone(), q, 25))
-  p.start()
+  listener = Process(target=listen, args=(Microphone(), q))
+  listener.start()
   print("Process started")
-  d = Process(target=destroy_frames, args=(q,))
-  d.start()
-  p.join()
-  d.terminate()
+  frames = read_frames(q, [], 5)
+  put_to_wav(frames, "out.wav")
+  print("training")
+  from classifier import train
+  train(["out.wav"], [0])
+  listener.terminate()
   print("Process ended")
